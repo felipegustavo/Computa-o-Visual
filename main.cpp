@@ -29,6 +29,9 @@ int screen_width;
 int screen_height;
 
 std::vector<Point> points_array;
+std::vector<Point> curve_array;
+
+bool draw_revolution = false;
 
 int factorial(int n) {
     if (n<=1) {
@@ -71,15 +74,15 @@ Point ccoord_to_vcoord(float clientX, float clientY) {
 void draw_dot(float x, float y) {
     glPointSize(8.0);
     glBegin(GL_POINTS);
-    glVertex2f(x, y);
+    glVertex3f(x, y, 0);
     glEnd();
 }
 
 void draw_line(Point p1, Point p2) {
     glLineWidth(5.0);
     glBegin(GL_LINES);
-    glVertex2f(p1.x, p1.y);
-    glVertex2f(p2.x, p2.y);
+    glVertex3f(p1.x, p1.y, 0);
+    glVertex3f(p2.x, p2.y, 0);
     glEnd();
 }
 
@@ -96,6 +99,10 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         glfwSetWindowShouldClose(window, GL_TRUE);
     } else if (key == GLFW_KEY_E) {
         points_array.clear();
+        curve_array.clear();
+        draw_revolution = false;
+    } else if(key == GLFW_KEY_R) {
+        draw_revolution = true;
     }
 }
 
@@ -111,7 +118,7 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
     points_array.push_back(p);
 }
 
-void display() {
+void draw_curve() {
     glColor3f(1.0, 1.0, 1.0);
     for (int i = 0; i < points_array.size(); i++) {
         draw_dot(points_array[i].x, points_array[i].y);
@@ -122,15 +129,31 @@ void display() {
 
     if (points_array.size() > 2) {
         glColor3f(0.2,1.0,0.0);
+        curve_array.clear();
+
         Point p1 = points_array[0];
+        curve_array.push_back(p1);
+
         for(float t = 0.0;t <= 1.0; t += 0.02) {
             Point p2 = get_next_bezier_point(t);
+            curve_array.push_back(p2);
+
             draw_line(p1, p2);
             p1 = p2;
         }
 
         glColor3f(1.0, 1.0, 1.0);
     }
+}
+
+void draw_surface() {
+    glPushMatrix();
+    glRotatef(90, 0., 1., 0.);
+    glColor3f(0.2,1.0,0.0);
+    for (int i = 1; i < curve_array.size(); i++) {
+        draw_line(curve_array[i-1], curve_array[i]);
+    }
+    glPopMatrix();
 }
 
 void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
@@ -170,7 +193,13 @@ int main() {
 
     while (!glfwWindowShouldClose(window)) {
         glClear(GL_COLOR_BUFFER_BIT);
-        display();
+
+        if (!draw_revolution) {
+            draw_curve();
+        } else {
+            draw_surface();
+        }
+        
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
