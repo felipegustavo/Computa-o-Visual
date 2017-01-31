@@ -28,8 +28,6 @@ int mouse_position_y;
 int screen_width;
 int screen_height;
 
-int clicks = 4;
-
 std::vector<Point> points_array;
 
 int factorial(int n) {
@@ -48,13 +46,15 @@ float binomial_coff(float n,float k) {
     return ans;
 }
 
-Point get_next_bezier_point(std::vector<Point> points, float t) {
+Point get_next_bezier_point(float t) {
     Point p;
     p.x = 0; p.y = 0;   
 
-    for (int i = 0; i < clicks; i++) {
-        p.x = p.x + binomial_coff((float)(clicks - 1), (float)i) * pow(t, (float)i) * pow((1 - t), (clicks - 1 - i)) * points[i].x;
-        p.y = p.y + binomial_coff((float)(clicks - 1), (float)i) * pow(t, (float)i) * pow((1 - t), (clicks - 1 - i)) * points[i].y;
+    int size = points_array.size();
+
+    for (int i = 0; i < size; i++) {
+        p.x = p.x + binomial_coff((float)(size - 1), (float)i) * pow(t, (float)i) * pow((1 - t), (size - 1 - i)) * points_array[i].x;
+        p.y = p.y + binomial_coff((float)(size - 1), (float)i) * pow(t, (float)i) * pow((1 - t), (size - 1 - i)) * points_array[i].y;
     }
 
     return p;
@@ -76,7 +76,7 @@ void draw_dot(float x, float y) {
 }
 
 void draw_line(Point p1, Point p2) {
-    glLineWidth(6.0);
+    glLineWidth(5.0);
     glBegin(GL_LINES);
     glVertex2f(p1.x, p1.y);
     glVertex2f(p2.x, p2.y);
@@ -96,7 +96,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         glfwSetWindowShouldClose(window, GL_TRUE);
     } else if (key == GLFW_KEY_E) {
         points_array.clear();
-        glClear(GL_COLOR_BUFFER_BIT);
     }
 }
 
@@ -110,18 +109,22 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 
     Point p = ccoord_to_vcoord(mouse_position_x, mouse_position_y);
     points_array.push_back(p);
+}
 
-    draw_dot(p.x, p.y);
-
-    if (points_array.size() == clicks) {
-        for(int k=0; k < clicks-1; k++) {
-         draw_line(points_array[k], points_array[k+1]);
+void display() {
+    glColor3f(1.0, 1.0, 1.0);
+    for (int i = 0; i < points_array.size(); i++) {
+        draw_dot(points_array[i].x, points_array[i].y);
+        if (i > 0) {
+            draw_line(points_array[i-1], points_array[i]);
         }
+    }
 
+    if (points_array.size() > 2) {
         glColor3f(0.2,1.0,0.0);
         Point p1 = points_array[0];
         for(float t = 0.0;t <= 1.0; t += 0.02) {
-            Point p2 = get_next_bezier_point(points_array,t);
+            Point p2 = get_next_bezier_point(t);
             draw_line(p1, p2);
             p1 = p2;
         }
@@ -150,6 +153,8 @@ int main() {
     window = glfwCreateWindow(960, 680, "Computação Visual - Atividade 1", NULL, NULL);
 
     if (!window) {
+        glClear(GL_COLOR_BUFFER_BIT);
+
         glfwTerminate();
         exit(EXIT_FAILURE);
     }
@@ -163,10 +168,9 @@ int main() {
     glfwSetMouseButtonCallback(window, mouse_button_callback);
     glfwSetCharCallback(window, character_callback);
 
-    glClear(GL_COLOR_BUFFER_BIT);
-
     while (!glfwWindowShouldClose(window)) {
-        //display();
+        glClear(GL_COLOR_BUFFER_BIT);
+        display();
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
