@@ -8,16 +8,18 @@
 
 class Point {
 public:
-    float x, y;
+    float x, y, z;
 
-    void setxy(float x2, float y2) {
+    void setxyz(float x2, float y2, float z2) {
         x = x2;
         y = y2;
+        z = z2;
     }
 
     const Point & operator=(const Point &point) {
         x = point.x;
         y = point.y;
+        z = point.z;
         return *this;
     }
 };
@@ -32,6 +34,7 @@ std::vector<Point> points_array;
 std::vector<Point> curve_array;
 
 bool draw_revolution = false;
+int turn = 0;
 
 int factorial(int n) {
     if (n<=1) {
@@ -67,6 +70,7 @@ Point ccoord_to_vcoord(float clientX, float clientY) {
     Point p;
     p.x = (clientX * 1.0f / screen_width * 2 - 1);
     p.y = (-clientY * 1.0f / screen_height * 2 + 1);
+    p.z = 0;
 
     return p;
 }
@@ -81,8 +85,8 @@ void draw_dot(float x, float y) {
 void draw_line(Point p1, Point p2) {
     glLineWidth(5.0);
     glBegin(GL_LINES);
-    glVertex3f(p1.x, p1.y, 0);
-    glVertex3f(p2.x, p2.y, 0);
+    glVertex3f(p1.x, p1.y, p1.z);
+    glVertex3f(p2.x, p2.y, p2.z);
     glEnd();
 }
 
@@ -103,6 +107,12 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         draw_revolution = false;
     } else if(key == GLFW_KEY_R) {
         draw_revolution = true;
+    } else if(key == GLFW_KEY_X) {
+        turn = 1;
+    } else if(key == GLFW_KEY_Y) {
+        turn = 2;
+    } else if(key == GLFW_KEY_Z) {
+        turn = 3;
     }
 }
 
@@ -147,13 +157,27 @@ void draw_curve() {
 }
 
 void draw_surface() {
-    glPushMatrix();
-    glRotatef(90, 0., 1., 0.);
-    glColor3f(0.2,1.0,0.0);
-    for (int i = 1; i < curve_array.size(); i++) {
-        draw_line(curve_array[i-1], curve_array[i]);
+    for (float ang = 0; ang < 360; ang += 0.5) {    
+        glMatrixMode(GL_MODELVIEW) ;
+        glPushMatrix();
+        glTranslatef(curve_array[0].x, curve_array[0].y, 0);
+
+        if (turn == 1 || turn == 0) {
+            glRotatef(ang, 1., 0., 0.);
+        } else if (turn == 2) {
+            glRotatef(ang, 0., 1., 0.);
+        } else {
+            glRotatef(ang, 0., 0., 1.);
+        }
+        
+        glTranslatef(curve_array[0].x, curve_array[0].y, 0);
+
+        for (int i = 1; i < curve_array.size(); i++) {
+            draw_line(curve_array[i-1], curve_array[i]);
+        }
+
+        glPopMatrix();
     }
-    glPopMatrix();
 }
 
 void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
