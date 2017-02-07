@@ -1,5 +1,6 @@
 #include <iostream>
 #include <vector>
+#include <cstdlib>
 #include <cmath>
 #include <GL/glew.h>
 
@@ -10,6 +11,8 @@
 #endif
 
 using namespace std;
+
+#define PI 2 * M_PI
 
 class Point {
 public:
@@ -29,11 +32,13 @@ public:
     }
 };
 
-std::vector<Point> points_array;
-std::vector<Point> curve_array;
+std::vector<Point> points;
+std::vector<Point> curve;
 
-int winWidth = 640;
-int winHeight = 480;
+int winWidth = 800;
+int winHeight = 600;
+
+bool isRotated = false;
 
 int factorial(int n) {
     if (n<=1) {
@@ -41,31 +46,30 @@ int factorial(int n) {
     } else {
         n=n * factorial(n-1);
     }
-
     return n;
 }
 
-float binomial_coff(float n,float k) {
+float binomialCoff(float n,float k) {
     float ans;
     ans = factorial(n) / (factorial(k)*factorial(n-k));
     return ans;
 }
 
-Point get_next_bezier_point(float t) {
+Point getNextBezierPoint(float t) {
     Point p;
     p.x = 0; p.y = 0;   
 
-    int size = points_array.size();
+    int size = points.size();
 
     for (int i = 0; i < size; i++) {
-        p.x = p.x + binomial_coff((float)(size - 1), (float)i) * pow(t, (float)i) * pow((1 - t), (size - 1 - i)) * points_array[i].x;
-        p.y = p.y + binomial_coff((float)(size - 1), (float)i) * pow(t, (float)i) * pow((1 - t), (size - 1 - i)) * points_array[i].y;
+        p.x = p.x + binomialCoff((float)(size - 1), (float)i) * pow(t, (float)i) * pow((1 - t), (size - 1 - i)) * points[i].x;
+        p.y = p.y + binomialCoff((float)(size - 1), (float)i) * pow(t, (float)i) * pow((1 - t), (size - 1 - i)) * points[i].y;
     }
 
     return p;
 }
 
-Point ccoord_to_vcoord(float clientX, float clientY) {
+Point ccoordToVcoord(float clientX, float clientY) {
     Point p;
     p.x = (clientX * 1.0f / winWidth * 2 - 1);
     p.y = (-clientY * 1.0f / winHeight * 2 + 1);
@@ -74,14 +78,14 @@ Point ccoord_to_vcoord(float clientX, float clientY) {
     return p;
 }
 
-void draw_dot(float x, float y) {
+void drawDot(Point p) {
     glPointSize(8.0);
     glBegin(GL_POINTS);
-    glVertex3f(x, y, 0);
+    glVertex3f(p.x, p.y, p.z);
     glEnd();
 }
 
-void draw_line(Point p1, Point p2) {
+void drawLine(Point p1, Point p2) {
     glLineWidth(5.0);
     glBegin(GL_LINES);
     glVertex3f(p1.x, p1.y, p1.z);
@@ -89,34 +93,86 @@ void draw_line(Point p1, Point p2) {
     glEnd();
 }
 
-void renderScene(void) {
+void calculateCurve() {
+	if (isRotated) {
+		return;
+	}
+
+	if (points.size() > 2) {
+        curve.clear();
+
+        Point p1 = points[0];
+        curve.push_back(p1);
+
+        for(float t = 0.0;t <= 1.0; t += 0.02) {
+            Point p2 = getNextBezierPoint(t);
+            curve.push_back(p2);
+            p1 = p2;
+        }
+    } else {
+    	curve.clear();
+    }
+}
+
+void calculateSurface(unsigned char axis) {
+	if (curve.empty()) {
+		return;
+	}
+
+	points.clear();
+
+	for (vector<Point>::iterator it = curve.begin(); it != curve.end(); ++it) {
+		for (float t = 0; t <= PI; t += 0.5) {
+			Point p;
+
+			if (axis == 'x') {
+				p.x = it->x;
+				p.y = it->y * cos(t) - it->z * sin(t);
+				p.z = it->y * sin(t) + it->z * cos(t);
+			} else if (axis == 'y') {
+				p.x = it->z * sin(t) + it->x * cos(t);
+				p.y = it->y;
+				p.z = it->z * cos(t) - it->x * sin(t);
+			} else {
+				p.x = it->x * cos(t) - it->y * sin(t);
+				p.y = it->x * sin(t) + it->y * cos(t);
+				p.z = it->z;
+			}
+
+			points.push_back(p);
+		}
+	}
+}
+
+void drawCurve(void) {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glColor3f(1.0, 1.0, 1.0);
 
-    for (int i = 0; i < points_array.size(); i++) {
-        draw_dot(points_array[i].x, points_array[i].y);
-        if (i > 0) {
-            draw_line(points_array[i-1], points_array[i]);
-        }
+	if (points.size() > 0) {
+		drawDot(points[0]);
+	}
+
+    for (int i = 1; i < points.size(); i++) {
+        drawDot(points[i]);
+        drawLine(points[i-1], points[i]);
     }
 
-    if (points_array.size() > 2) {
-        glColor3f(0.2,1.0,0.0);
-        curve_array.clear();
-
-        Point p1 = points_array[0];
-        curve_array.push_back(p1);
-
-        for(float t = 0.0;t <= 1.0; t += 0.02) {
-            Point p2 = get_next_bezier_point(t);
-            curve_array.push_back(p2);
-
-            draw_line(p1, p2);
-            p1 = p2;
-        }
-
-        glColor3f(1.0, 1.0, 1.0);
+    glColor3f(0.2,1.0,0.0);
+    for (int i = 1; i < curve.size(); i++) {
+    	drawLine(curve[i-1], curve[i]);
     }
+    glColor3f(1.0, 1.0, 1.0);
+
+	glutSwapBuffers();  
+}
+
+void drawSurface(void) {
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glColor3f(1.0, 1.0, 1.0);
+
+	for (vector<Point>::iterator it = points.begin(); it != points.end(); ++it) {
+		drawDot((*it));
+	}
 
 	glutSwapBuffers();
 }
@@ -146,9 +202,46 @@ void reshape(int w, int h) {
 }
 
 void mouseClick(int button, int state, int x, int y) {
-	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
-		Point p = ccoord_to_vcoord(x, y);
-   		points_array.push_back(p);
+	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN && !isRotated) {
+		Point p = ccoordToVcoord(x, y);
+   		points.push_back(p);
+   		calculateCurve();
+	}
+}
+
+void processNormalKeys(unsigned char key, int x, int y) {
+	switch (key) {
+		case 27 :
+			exit(EXIT_SUCCESS);
+			break;
+
+		case 'q' :
+			points.clear();
+			curve.clear();
+			isRotated = false;
+			break;
+
+		case 'w' :
+			if (points.size() > 0 && !isRotated) {
+				points.pop_back();
+			}
+			calculateCurve();
+			break;
+
+		case 'x' :
+		case 'y' :
+		case 'z' :
+			calculateSurface(key);
+			isRotated = true;
+			break;
+	}
+}
+
+void renderScene(void) {
+	if (isRotated) {
+		drawSurface();
+	} else {
+		drawCurve();
 	}
 }
 
@@ -163,10 +256,11 @@ int main(int argc, char **argv) {
 	glutIdleFunc(renderScene);
 	glutReshapeFunc(reshape);
 	glutMouseFunc(mouseClick);
+	glutKeyboardFunc(processNormalKeys);
 
 	initGL();
 
 	glutMainLoop();
 
-	return 1;
+	return EXIT_SUCCESS;
 }
