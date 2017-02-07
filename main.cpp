@@ -1,10 +1,15 @@
-#include <stdlib.h>
-#include <stdio.h>
+#include <iostream>
 #include <vector>
-#include <math.h>
-
+#include <cmath>
 #include <GL/glew.h>
-#include <GLFW/glfw3.h>
+
+#ifdef __APPLE__
+#include <GLUT/glut.h>
+#else
+#include <GL/glut.h>
+#endif
+
+using namespace std;
 
 class Point {
 public:
@@ -24,17 +29,11 @@ public:
     }
 };
 
-int mouse_position_x;
-int mouse_position_y;
-
-int screen_width;
-int screen_height;
-
 std::vector<Point> points_array;
 std::vector<Point> curve_array;
 
-bool draw_revolution = false;
-int turn = 0;
+int winWidth = 640;
+int winHeight = 480;
 
 int factorial(int n) {
     if (n<=1) {
@@ -68,8 +67,8 @@ Point get_next_bezier_point(float t) {
 
 Point ccoord_to_vcoord(float clientX, float clientY) {
     Point p;
-    p.x = (clientX * 1.0f / screen_width * 2 - 1);
-    p.y = (-clientY * 1.0f / screen_height * 2 + 1);
+    p.x = (clientX * 1.0f / winWidth * 2 - 1);
+    p.y = (-clientY * 1.0f / winHeight * 2 + 1);
     p.z = 0;
 
     return p;
@@ -90,46 +89,10 @@ void draw_line(Point p1, Point p2) {
     glEnd();
 }
 
-void error_callback(int error, const char* description) {
-    fprintf(stderr, description);
-}
+void renderScene(void) {
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glColor3f(1.0, 1.0, 1.0);
 
-void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-    if (action != GLFW_PRESS) {
-        return;
-    }
-
-    if (key == GLFW_KEY_ESCAPE) {
-        glfwSetWindowShouldClose(window, GL_TRUE);
-    } else if (key == GLFW_KEY_E) {
-        points_array.clear();
-        curve_array.clear();
-        draw_revolution = false;
-    } else if(key == GLFW_KEY_R) {
-        draw_revolution = true;
-    } else if(key == GLFW_KEY_X) {
-        turn = 1;
-    } else if(key == GLFW_KEY_Y) {
-        turn = 2;
-    } else if(key == GLFW_KEY_Z) {
-        turn = 3;
-    }
-}
-
-void character_callback(GLFWwindow* window, unsigned int codepoint) {
-}
-
-void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
-    if (action != GLFW_PRESS) {
-        return;
-    }
-
-    Point p = ccoord_to_vcoord(mouse_position_x, mouse_position_y);
-    points_array.push_back(p);
-}
-
-void draw_curve() {
-    glColor3f(1.0, 1.0, 1.0);
     for (int i = 0; i < points_array.size(); i++) {
         draw_dot(points_array[i].x, points_array[i].y);
         if (i > 0) {
@@ -154,82 +117,56 @@ void draw_curve() {
 
         glColor3f(1.0, 1.0, 1.0);
     }
+
+	glutSwapBuffers();
 }
 
-void draw_surface() {
-    for (float ang = 0; ang < 360; ang += 0.5) {    
-        glMatrixMode(GL_MODELVIEW) ;
-        glPushMatrix();
-        glTranslatef(curve_array[0].x, curve_array[0].y, 0);
+void initGL(void) {
+	glClearColor(0.0, 0.0, 0.0, 0.0);
 
-        if (turn == 1 || turn == 0) {
-            glRotatef(ang, 1., 0., 0.);
-        } else if (turn == 2) {
-            glRotatef(ang, 0., 1., 0.);
-        } else {
-            glRotatef(ang, 0., 0., 1.);
-        }
-        
-        glTranslatef(curve_array[0].x, curve_array[0].y, 0);
+	if (glewInit()) {
+		cout << "Can't initialize GLEW." << endl;
+		exit(EXIT_FAILURE);
+	}
 
-        for (int i = 1; i < curve_array.size(); i++) {
-            draw_line(curve_array[i-1], curve_array[i]);
-        }
-
-        glPopMatrix();
-    }
+	cout << "Status" << endl;
+	cout << "GLEW version: " << glewGetString(GLEW_VERSION) << endl;
+	cout << "OpenGL version: " << glGetString(GL_VERSION) << endl;
+	cout << "OpenGL vendor: " << glGetString(GL_VENDOR) << endl;
+	cout << "OpenGL render: " << glGetString(GL_RENDERER) << endl;
+	cout << "OpenGL shading language version: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << endl;
 }
 
-void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
-    mouse_position_x = xpos;
-    mouse_position_y = ypos;
-}  
+void reshape(int w, int h) {
+	winWidth = w;
+	winHeight = h;
 
-int main() {
-    GLFWwindow* window;
+	glViewport(0, 0, winWidth, winHeight);
+	glutPostRedisplay();
+}
 
-    glfwSetErrorCallback(error_callback);
+void mouseClick(int button, int state, int x, int y) {
+	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
+		Point p = ccoord_to_vcoord(x, y);
+   		points_array.push_back(p);
+	}
+}
 
-    if (!glfwInit()) {
-        exit(EXIT_FAILURE);
-    }
+int main(int argc, char **argv) {
+	glutInit(&argc, argv);
+	glutInitDisplayMode(GLUT_DEPTH | GLUT_DOUBLE | GLUT_RGBA);
+	glutInitWindowPosition(100, 100);
+	glutInitWindowSize(winWidth, winHeight);
+	glutCreateWindow("Computacao Visual - Atividade 1");
 
-    glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
+	glutDisplayFunc(renderScene);
+	glutIdleFunc(renderScene);
+	glutReshapeFunc(reshape);
+	glutMouseFunc(mouseClick);
 
-    // window = glfwCreateWindow(640, 480, "Computação Visual - Atividade 1", glfwGetPrimaryMonitor(), NULL);
-    window = glfwCreateWindow(960, 680, "Computação Visual - Atividade 1", NULL, NULL);
+	initGL();
 
-    if (!window) {
-        glClear(GL_COLOR_BUFFER_BIT);
+	glutMainLoop();
 
-        glfwTerminate();
-        exit(EXIT_FAILURE);
-    }
-
-    glfwMakeContextCurrent(window);
-
-    glfwGetWindowSize(window, &screen_width, &screen_height);
-
-    glfwSetKeyCallback(window, key_callback);
-    glfwSetCursorPosCallback(window, cursor_position_callback);
-    glfwSetMouseButtonCallback(window, mouse_button_callback);
-    glfwSetCharCallback(window, character_callback);
-
-    while (!glfwWindowShouldClose(window)) {
-        glClear(GL_COLOR_BUFFER_BIT);
-
-        if (!draw_revolution) {
-            draw_curve();
-        } else {
-            draw_surface();
-        }
-        
-        glfwSwapBuffers(window);
-        glfwPollEvents();
-    }
-
-    glfwDestroyWindow(window);
-    glfwTerminate();
-
-    exit(EXIT_SUCCESS);
+	return 1;
 }
