@@ -32,8 +32,9 @@ public:
     }
 };
 
-std::vector<Point> points;
-std::vector<Point> curve;
+vector<Point> points;
+vector<Point> curve;
+vector< vector<Point> > surface;
 
 int winWidth = 800;
 int winHeight = 600;
@@ -79,14 +80,14 @@ Point ccoordToVcoord(float clientX, float clientY) {
 }
 
 void drawDot(Point p) {
-    glPointSize(8.0);
+    glPointSize(5.0);
     glBegin(GL_POINTS);
     glVertex3f(p.x, p.y, p.z);
     glEnd();
 }
 
 void drawLine(Point p1, Point p2) {
-    glLineWidth(5.0);
+    glLineWidth(3.0);
     glBegin(GL_LINES);
     glVertex3f(p1.x, p1.y, p1.z);
     glVertex3f(p2.x, p2.y, p2.z);
@@ -119,12 +120,11 @@ void calculateSurface(unsigned char axis) {
 		return;
 	}
 
-	points.clear();
-
 	for (vector<Point>::iterator it = curve.begin(); it != curve.end(); ++it) {
-		for (float t = 0; t <= PI; t += 0.5) {
-			Point p;
+		vector<Point> line;
 
+		for (float t = 0; t <= PI; t += 1) {
+			Point p;
 			if (axis == 'x') {
 				p.x = it->x;
 				p.y = it->y * cos(t) - it->z * sin(t);
@@ -138,10 +138,12 @@ void calculateSurface(unsigned char axis) {
 				p.y = it->x * sin(t) + it->y * cos(t);
 				p.z = it->z;
 			}
-
-			points.push_back(p);
+			line.push_back(p);
 		}
+
+		surface.push_back(line);
 	}
+
 }
 
 void drawCurve(void) {
@@ -167,12 +169,26 @@ void drawCurve(void) {
 }
 
 void drawSurface(void) {
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glColor3f(1.0, 1.0, 1.0);
-
-	for (vector<Point>::iterator it = points.begin(); it != points.end(); ++it) {
-		drawDot((*it));
+	if (curve.empty()) {
+		return;
 	}
+
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	
+	glBegin(GL_LINES);
+
+	for (int i = 0; i < surface.size() - 1; i++) {
+		for (int j = 0; j < surface[i].size() - 1; j++) {
+			glVertex3f(surface[i][j].x, surface[i][j].y, surface[i][j].z);
+			glVertex3f(surface[i][j+1].x, surface[i][j+1].y, surface[i][j+1].z);
+			glVertex3f(surface[i+1][j+1].x, surface[i+1][j+1].y, surface[i+1][j+1].z);
+			glVertex3f(surface[i+1][j].x, surface[i+1][j].y, surface[i+1][j].z);
+		}
+	}
+
+	glEnd();
 
 	glutSwapBuffers();
 }
@@ -228,9 +244,15 @@ void processNormalKeys(unsigned char key, int x, int y) {
 			calculateCurve();
 			break;
 
+		case 'e' :
+			surface.clear();
+			isRotated = false;
+			break;
+
 		case 'x' :
 		case 'y' :
 		case 'z' :
+			surface.clear();
 			calculateSurface(key);
 			isRotated = true;
 			break;
