@@ -1,7 +1,10 @@
-all: pre main
+all: main.o main.out clean
 
-pre:
-	rm -f main.out
+main.out: main.o
+	g++ main.o -o main.out -lGLEW -lglfw -lGL -lX11 -lXi -lXrandr -lXxf86vm -lXinerama -lXcursor -lrt -lm -pthread
 
-main:
-	g++ -o main.out main.cpp -lglut -lGL -lGLEW -lGLU
+main.o:
+	g++ -std=c++11 -c main.cpp
+
+clean:
+	rm -f *.o main.o
