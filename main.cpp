@@ -280,7 +280,7 @@ void drawSurfaceWithTex() {
 	textureShader.use();
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, texture);
-	glUniform1i(glGetUniformLocation(textureShader.program, "ourTexture" ), 0);
+	glUniform1i(glGetUniformLocation(textureShader.program, "outTex" ), 0);
 
 	glBindVertexArray(surfaceVAO);
 	glDrawArrays(GL_TRIANGLES, 0, surfaceVertices.size());

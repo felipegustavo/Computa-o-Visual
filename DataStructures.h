@@ -39,4 +39,12 @@ struct TextureVertex {
 	}
 };
 
+enum Camera_Movement
+{
+    FORWARD,
+    BACKWARD,
+    LEFT,
+    RIGHT
+};
+
 #endif
