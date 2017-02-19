@@ -1,3 +1,6 @@
+#ifndef CAMERA_H_
+#define CAMERA_H_
+
 #include <vector>
 
 #include <GL/glew.h>
@@ -9,8 +12,8 @@
 
 const GLfloat YAW = -90.0f;
 const GLfloat PITCH = 0.0f;
-const GLfloat SPEED = 6.0f;
-const GLfloat SENSITIVTY = 0.25f;
+const GLfloat SPEED = 3.0f;
+const GLfloat SENSITIVTY = 0.20f;
 const GLfloat ZOOM = 45.0f;
 
 class Camera {
@@ -53,12 +56,24 @@ public:
 		this->updateCameraVectors();
 	}
 
-	glm::mat4 GetViewMatrix() {
+	void reset() {
+		this->position = glm::vec3(0.0f, 0.0f, 1.1f);
+		this->worldUp = glm::vec3(0.0f, 1.0f, 0.0f);
+		this->yaw = YAW;
+		this->pitch = PITCH;
+		front = glm::vec3(0.0f, 0.0f, -1.0f);
+		movementSpeed = SPEED;
+		mouseSensitivity = SENSITIVTY;
+		zoom = 45.0f;
+		this->updateCameraVectors();
+	}
+
+	glm::mat4 getViewMatrix() {
 		return glm::lookAt(this->position, this->position + this->front,
 				this->up);
 	}
 
-	void ProcessKeyboard(Camera_Movement direction, GLfloat deltaTime) {
+	void processKeyboard(CameraMovement direction, GLfloat deltaTime) {
 		GLfloat velocity = this->movementSpeed * deltaTime;
 
 		if (direction == FORWARD) {
@@ -78,7 +93,7 @@ public:
 		}
 	}
 
-	void ProcessMouseMovement(GLfloat xOffset, GLfloat yOffset,
+	void processMouseMovement(GLfloat xOffset, GLfloat yOffset,
 			GLboolean constrainPitch = true) {
 		xOffset *= this->mouseSensitivity;
 		yOffset *= this->mouseSensitivity;
@@ -99,28 +114,17 @@ public:
 		this->updateCameraVectors();
 	}
 
-	void ProcessMouseScroll(GLfloat yOffset) {
-		if (this->zoom >= 1.0f && this->zoom <= 45.0f) {
-			this->zoom -= yOffset;
-		}
-
-		if (this->zoom <= 1.0f) {
-			this->zoom = 1.0f;
-		}
-
-		if (this->zoom >= 45.0f) {
-			this->zoom = 45.0f;
-		}
-	}
-
 	void updateCameraVectors() {
 		glm::vec3 front;
 		front.x = cos(glm::radians(this->yaw)) * cos(glm::radians(this->pitch));
 		front.y = sin(glm::radians(this->pitch));
 		front.z = sin(glm::radians(this->yaw)) * cos(glm::radians(this->pitch));
 		this->front = glm::normalize(front);
-		this->right = glm::normalize(glm::cross(this->front, this->worldUp));
+
+		this->right = glm::normalize(glm::cross(this->front, this->worldUp)); // Normalize the vectors, because their length gets closer to 0 the more you look up or down which results in slower movement.
 		this->up = glm::normalize(glm::cross(this->right, this->front));
 	}
 
 };
+
+#endif

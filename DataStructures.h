@@ -39,12 +39,8 @@ struct TextureVertex {
 	}
 };
 
-enum Camera_Movement
-{
-    FORWARD,
-    BACKWARD,
-    LEFT,
-    RIGHT
+enum CameraMovement {
+	FORWARD, BACKWARD, LEFT, RIGHT
 };
 
 #endif

@@ -1,4 +1,4 @@
-all: main.out clear
+all: main.out
 
 main.out: main.o
 	g++ main.o -o main.out -lGLEW -lglfw -lGL -lSOIL -lX11 -lXi -lXrandr -lXxf86vm -lXinerama -lXcursor -lrt -lm -pthread
@@ -6,5 +6,5 @@ main.out: main.o
 main.o:
 	g++ -std=c++11 -c ../main.cpp
 	
-clear:
+clean:
 	rm -f main.o
