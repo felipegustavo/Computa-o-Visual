@@ -8,6 +8,7 @@
 #include <glm/gtx/rotate_vector.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/normal.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
 #include <GL/glew.h>
@@ -44,10 +45,12 @@ GLfloat lastFrame = 0.0f;
 int MOUSEX;
 int MOUSEY;
 
+glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
+
 Shader defaultShader;
 Shader textureShader;
 Shader surfaceShader;
-Shader ctrlShader;
+Shader lampShader;
 
 GLuint surfaceVAO;
 GLuint surfaceVBO;
@@ -61,7 +64,18 @@ GLuint curveVBO;
 GLuint axisVAO;
 GLuint axisVBO;
 
-GLuint texture;
+GLuint lampVAO;
+GLuint lampVBO;
+
+GLuint specularTexture;
+GLuint diffuseTexture;
+
+glm::vec3 pointLightPositions[] = {
+	glm::vec3(0.7f, 0.2f, 2.0f),
+	glm::vec3(2.3f, -3.3f, -4.0f),
+	glm::vec3(-4.0f, 2.0f, -12.0f),
+	glm::vec3(0.0f, 0.0f, -3.0f)
+};
 
 vector<ColorVertex> baseLineVertices;
 vector<ColorVertex> bezierCurveVertices;
@@ -80,7 +94,7 @@ void calculateSurfeceVertices(const char axis) {
 		mm++;
 		vector<TextureVertex> curveVec;
 		for (vector<ColorVertex>::iterator it = bezierCurveVertices.begin();
-				it != bezierCurveVertices.end(); ++it) {
+		it != bezierCurveVertices.end(); ++it) {
 			vec3 rvec;
 
 			if (axis == 'y') {
@@ -89,7 +103,7 @@ void calculateSurfeceVertices(const char axis) {
 				rvec = rotateX(it->position, (GLfloat) t);
 			}
 
-			curveVec.push_back(TextureVertex(rvec, vec3(1.0f, 1.0f, 1.0f), vec2(0.0f, 0.0f)));
+			curveVec.push_back(TextureVertex(rvec, vec3(1.0f, 1.0f, 1.0f), vec2(0.0f, 0.0f), vec3(0.0f, 0.0f, 0.0f)));
 		}
 		surfVec.push_back(curveVec);
 	}
@@ -98,23 +112,33 @@ void calculateSurfeceVertices(const char axis) {
 
 	for (int i = 0; i < surfVec.size() - 1; i++) {
 		for (int j = 0; j < surfVec[i].size() - 1; j++) {
-			surfaceVertices.push_back(TextureVertex(surfVec[i][j + 1].position, surfVec[i][j + 1].color, vec2(0.0f, 0.0f)));
-			surfaceVertices.push_back(TextureVertex(surfVec[i + 1][j + 1].position, surfVec[i + 1][j + 1].color, vec2(1.0f, 0.0f)));
-			surfaceVertices.push_back(TextureVertex(surfVec[i + 1][j].position,	surfVec[i + 1][j].color, vec2(1.0f, 1.0f)));
-			surfaceVertices.push_back(TextureVertex(surfVec[i + 1][j].position, surfVec[i + 1][j].color, vec2(1.0f, 1.0f)));
-			surfaceVertices.push_back(TextureVertex(surfVec[i][j].position, surfVec[i][j].color, vec2(0.0f, 1.0f)));
-			surfaceVertices.push_back(TextureVertex(surfVec[i][j + 1].position, surfVec[i][j + 1].color, vec2(0.0f, 0.0f)));
+			vec3 normal = triangleNormal(surfVec[i][j + 1].position, surfVec[i + 1][j + 1].position, surfVec[i + 1][j].position);
+
+			surfaceVertices.push_back(TextureVertex(surfVec[i][j + 1].position, surfVec[i][j + 1].color, vec2(0.0f, 0.0f), normal));
+			surfaceVertices.push_back(TextureVertex(surfVec[i + 1][j + 1].position, surfVec[i + 1][j + 1].color, vec2(1.0f, 0.0f), normal));
+			surfaceVertices.push_back(TextureVertex(surfVec[i + 1][j].position,	surfVec[i + 1][j].color, vec2(1.0f, 1.0f), normal));
+
+			normal = triangleNormal(surfVec[i + 1][j].position, surfVec[i][j].position, surfVec[i][j + 1].position);
+
+			surfaceVertices.push_back(TextureVertex(surfVec[i + 1][j].position, surfVec[i + 1][j].color, vec2(1.0f, 1.0f), normal));
+			surfaceVertices.push_back(TextureVertex(surfVec[i][j].position, surfVec[i][j].color, vec2(0.0f, 1.0f), normal));
+			surfaceVertices.push_back(TextureVertex(surfVec[i][j + 1].position, surfVec[i][j + 1].color, vec2(0.0f, 0.0f), normal));
 		}
 	}
 
 	const int p = surfVec.size() - 1;
 	for (int j = 0; j < surfVec.back().size() - 1; j++) {
-		surfaceVertices.push_back(TextureVertex(surfVec[p][j + 1].position, surfVec[p][j + 1].color, vec2(0.0f, 0.0f)));
-		surfaceVertices.push_back(TextureVertex(surfVec[0][j + 1].position, surfVec[0][j + 1].color, vec2(1.0f, 0.0f)));
-		surfaceVertices.push_back(TextureVertex(surfVec[0][j].position, surfVec[0][j].color, vec2(1.0f, 1.0f)));
-		surfaceVertices.push_back(TextureVertex(surfVec[0][j].position, surfVec[0][j].color, vec2(1.0f, 1.0f)));
-		surfaceVertices.push_back(TextureVertex(surfVec[p][j].position, surfVec[p][j].color, vec2(0.0f, 1.0f)));
-		surfaceVertices.push_back(TextureVertex(surfVec[p][j + 1].position,	surfVec[p][j + 1].color, vec2(0.0f, 0.0f)));
+		vec3 normal = triangleNormal(surfVec[p][j + 1].position, surfVec[0][j + 1].position, surfVec[0][j].position);
+
+		surfaceVertices.push_back(TextureVertex(surfVec[p][j + 1].position, surfVec[p][j + 1].color, vec2(0.0f, 0.0f), normal));
+		surfaceVertices.push_back(TextureVertex(surfVec[0][j + 1].position, surfVec[0][j + 1].color, vec2(1.0f, 0.0f), normal));
+		surfaceVertices.push_back(TextureVertex(surfVec[0][j].position, surfVec[0][j].color, vec2(1.0f, 1.0f), normal));
+
+		normal = triangleNormal(surfVec[0][j].position, surfVec[p][j].position, surfVec[p][j + 1].position);
+
+		surfaceVertices.push_back(TextureVertex(surfVec[0][j].position, surfVec[0][j].color, vec2(1.0f, 1.0f), normal));
+		surfaceVertices.push_back(TextureVertex(surfVec[p][j].position, surfVec[p][j].color, vec2(0.0f, 1.0f), normal));
+		surfaceVertices.push_back(TextureVertex(surfVec[p][j + 1].position,	surfVec[p][j + 1].color, vec2(0.0f, 0.0f), normal));
 	}
 }
 
@@ -191,28 +215,95 @@ void calculateBezier() {
 
 //----------------- CREATE AND UPDATE ELEMENTS--------
 
-void changeTexture(const char* tex) {
-	glGenTextures(1, &texture);
+void applyTexture(const char* diffuseTex, const char* specularTex) {
+	glGenTextures(1, &diffuseTexture);
+	glGenTextures(1, &specularTexture);
 
-	int width, height;
-	glBindTexture(GL_TEXTURE_2D, texture);
+	int imageWidth, imageHeight;
+	unsigned char *image;
 
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
-
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-	unsigned char *image = SOIL_load_image(tex, &width, &height, 0,
-			SOIL_LOAD_RGBA);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA,
-			GL_UNSIGNED_BYTE, image);
+	image = SOIL_load_image(diffuseTex, &imageWidth, &imageHeight, 0, SOIL_LOAD_RGB);
+	glBindTexture(GL_TEXTURE_2D, diffuseTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, imageWidth, imageHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
 	glGenerateMipmap(GL_TEXTURE_2D);
-	glBindTexture(GL_TEXTURE_2D, 0);
 	SOIL_free_image_data(image);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+
+	image = SOIL_load_image(specularTex, &imageWidth, &imageHeight, 0, SOIL_LOAD_RGB);
+	glBindTexture(GL_TEXTURE_2D, specularTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, imageWidth, imageHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
+	glGenerateMipmap(GL_TEXTURE_2D);
+	SOIL_free_image_data(image);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-void createSurfaceWithTex() {
+void createLamp() {
+	glGenVertexArrays(1, &lampVAO);
+	glGenBuffers(1, &lampVBO);
+
+	glBindVertexArray(lampVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, lampVBO);
+
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid *)0);
+
+	const GLfloat lampCube[] = {
+		-0.5f, -0.5f, -0.5f,
+		0.5f, -0.5f, -0.5f,
+		0.5f,  0.5f, -0.5f,
+		0.5f,  0.5f, -0.5f,
+		-0.5f,  0.5f, -0.5f,
+		-0.5f, -0.5f, -0.5f,
+
+		-0.5f, -0.5f,  0.5f,
+		0.5f, -0.5f,  0.5f,
+		0.5f,  0.5f,  0.5f,
+		0.5f,  0.5f,  0.5f,
+		-0.5f,  0.5f,  0.5f,
+		-0.5f, -0.5f,  0.5f,
+
+		-0.5f,  0.5f,  0.5f,
+		-0.5f,  0.5f, -0.5f,
+		-0.5f, -0.5f, -0.5f,
+		-0.5f, -0.5f, -0.5f,
+		-0.5f, -0.5f,  0.5f,
+		-0.5f,  0.5f,  0.5f,
+
+		0.5f,  0.5f,  0.5f,
+		0.5f,  0.5f, -0.5f,
+		0.5f, -0.5f, -0.5f,
+		0.5f, -0.5f, -0.5f,
+		0.5f, -0.5f,  0.5f,
+		0.5f,  0.5f,  0.5f,
+
+		-0.5f, -0.5f, -0.5f,
+		0.5f, -0.5f, -0.5f,
+		0.5f, -0.5f,  0.5f,
+		0.5f, -0.5f,  0.5f,
+		-0.5f, -0.5f,  0.5f,
+		-0.5f, -0.5f, -0.5f,
+
+		-0.5f,  0.5f, -0.5f,
+		0.5f,  0.5f, -0.5f,
+		0.5f,  0.5f,  0.5f,
+		0.5f,  0.5f,  0.5f,
+		-0.5f,  0.5f,  0.5f,
+		-0.5f,  0.5f, -0.5f,
+	};
+
+	glBufferData(GL_ARRAY_BUFFER, sizeof(lampCube), lampCube, GL_STATIC_DRAW);
+
+	glBindVertexArray(0);
+}
+
+void createSurface() {
 	glGenVertexArrays(1, &surfaceVAO);
 	glGenBuffers(1, &surfaceVBO);
 
@@ -220,20 +311,20 @@ void createSurfaceWithTex() {
 
 	glBindBuffer(GL_ARRAY_BUFFER, surfaceVBO);
 	glBufferData(GL_ARRAY_BUFFER,
-			sizeof(TextureVertex) * surfaceVertices.size(), &surfaceVertices[0],
-			GL_STATIC_DRAW);
+	sizeof(TextureVertex) * surfaceVertices.size(), &surfaceVertices[0],
+	GL_STATIC_DRAW);
 
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(TextureVertex),
-			(void*) 0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(TextureVertex), (void*) 0);
 
 	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(TextureVertex),
-			(void*) 12);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(TextureVertex), (void*) 12);
 
 	glEnableVertexAttribArray(2);
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(TextureVertex),
-			(void*) 24);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(TextureVertex), (void*) 24);
+
+	glEnableVertexAttribArray(3);
+	glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(TextureVertex), (void*) 32);
 
 	glBindVertexArray(0);
 }
@@ -247,23 +338,23 @@ void createAxis() {
 
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(ColorVertex),
-			(void*) 0);
+	(void*) 0);
 
 	glEnableVertexAttribArray(1);
 	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(ColorVertex),
-			(void*) 12);
+	(void*) 12);
 
-	ColorVertex vertices[] = {
-			ColorVertex(vec3(-100.0f, 0, 0), vec3(1.0f, 0, 0)),
-			ColorVertex(vec3(1000.0f, 0, 0), vec3(1.0f, 0, 0)),
-			ColorVertex(vec3(0, -1000.0, 0), vec3(0, 1.0f, 0)),
-			ColorVertex(vec3(0, 1000.0, 0), vec3(0, 1.0f, 0)),
-			ColorVertex(vec3(0, 0, -1000.0), vec3(0, 0, 1.0f)),
-			ColorVertex(vec3(0, 0, 1000.0), vec3(0, 0, 1.0f))
+	const ColorVertex vertices[] = {
+		ColorVertex(vec3(-100.0f, 0, 0), vec3(1.0f, 0, 0)),
+		ColorVertex(vec3(1000.0f, 0, 0), vec3(1.0f, 0, 0)),
+		ColorVertex(vec3(0, -1000.0, 0), vec3(0, 1.0f, 0)),
+		ColorVertex(vec3(0, 1000.0, 0), vec3(0, 1.0f, 0)),
+		ColorVertex(vec3(0, 0, -1000.0), vec3(0, 0, 1.0f)),
+		ColorVertex(vec3(0, 0, 1000.0), vec3(0, 0, 1.0f))
 	};
 
 	glBufferData(GL_ARRAY_BUFFER, sizeof(ColorVertex) * 6, &vertices[0],
-			GL_STATIC_DRAW);
+	GL_STATIC_DRAW);
 
 	glBindVertexArray(0);
 }
@@ -277,11 +368,11 @@ void createBase() {
 
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(ColorVertex),
-			(void*) 0);
+	(void*) 0);
 
 	glEnableVertexAttribArray(1);
 	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(ColorVertex),
-			(void*) 12);
+	(void*) 12);
 
 	glBufferData(GL_ARRAY_BUFFER, 0, nullptr, GL_STATIC_DRAW);
 
@@ -297,11 +388,11 @@ void createCurve() {
 
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(ColorVertex),
-			(void*) 0);
+	(void*) 0);
 
 	glEnableVertexAttribArray(1);
 	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(ColorVertex),
-			(void*) 12);
+	(void*) 12);
 
 	glBufferData(GL_ARRAY_BUFFER, 0, nullptr, GL_STATIC_DRAW);
 
@@ -313,14 +404,12 @@ void updatePoints() {
 	glBindBuffer(GL_ARRAY_BUFFER, baseVBO);
 
 	glBufferData(GL_ARRAY_BUFFER, sizeof(ColorVertex) * baseLineVertices.size(),
-			&baseLineVertices[0], GL_STREAM_DRAW);
+	&baseLineVertices[0], GL_STREAM_DRAW);
 
 	glBindVertexArray(curveVAO);
 	glBindBuffer(GL_ARRAY_BUFFER, curveVBO);
 
-	glBufferData(GL_ARRAY_BUFFER,
-			sizeof(ColorVertex) * bezierCurveVertices.size(),
-			&bezierCurveVertices[0], GL_STREAM_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(ColorVertex) * bezierCurveVertices.size(), &bezierCurveVertices[0], GL_STREAM_DRAW);
 
 	glBindVertexArray(0);
 }
@@ -332,17 +421,106 @@ void updatePoints() {
 void drawSurfaceWithTex() {
 	textureShader.use();
 
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glUniform1i(glGetUniformLocation(textureShader.program, "ourTexture"), 0);
+	GLint viewPosLoc = glGetUniformLocation(textureShader.program, "viewPos");
+	glUniform3f(viewPosLoc, camera.position.x, camera.position.y, camera.position.z);
+	glUniform1f(glGetUniformLocation(textureShader.program, "material.shininess"), 32.0f);
 
-	prepareCamera(textureShader.program);
+	glUniform3f(glGetUniformLocation(textureShader.program, "dirLight.direction"), -0.2f, -1.0f, -0.3f);
+	glUniform3f(glGetUniformLocation(textureShader.program, "dirLight.ambient"), 0.05f, 0.05f, 0.05f);
+	glUniform3f(glGetUniformLocation(textureShader.program, "dirLight.diffuse"), 0.4f, 0.4f, 0.4f);
+	glUniform3f(glGetUniformLocation(textureShader.program, "dirLight.specular"), 0.5f, 0.5f, 0.5f);
+
+	glUniform3f(glGetUniformLocation(textureShader.program, "pointLights[0].position"), pointLightPositions[0].x, pointLightPositions[0].y, pointLightPositions[0].z);
+	glUniform3f(glGetUniformLocation(textureShader.program, "pointLights[0].ambient"), 0.05f, 0.05f, 0.05f);
+	glUniform3f(glGetUniformLocation(textureShader.program, "pointLights[0].diffuse"), 0.8f, 0.8f, 0.8f);
+	glUniform3f(glGetUniformLocation(textureShader.program, "pointLights[0].specular"), 1.0f, 1.0f, 1.0f);
+	glUniform1f(glGetUniformLocation(textureShader.program, "pointLights[0].constant"), 1.0f);
+	glUniform1f(glGetUniformLocation(textureShader.program, "pointLights[0].linear"), 0.09f);
+	glUniform1f(glGetUniformLocation(textureShader.program, "pointLights[0].quadratic"), 0.032f);
+
+	glUniform3f(glGetUniformLocation(textureShader.program, "pointLights[1].position"), pointLightPositions[1].x, pointLightPositions[1].y, pointLightPositions[1].z);
+	glUniform3f(glGetUniformLocation(textureShader.program, "pointLights[1].ambient"), 0.05f, 0.05f, 0.05f);
+	glUniform3f(glGetUniformLocation(textureShader.program, "pointLights[1].diffuse"), 0.8f, 0.8f, 0.8f);
+	glUniform3f(glGetUniformLocation(textureShader.program, "pointLights[1].specular"), 1.0f, 1.0f, 1.0f);
+	glUniform1f(glGetUniformLocation(textureShader.program, "pointLights[1].constant"), 1.0f);
+	glUniform1f(glGetUniformLocation(textureShader.program, "pointLights[1].linear"), 0.09f);
+	glUniform1f(glGetUniformLocation(textureShader.program, "pointLights[1].quadratic"), 0.032f);
+
+	glUniform3f(glGetUniformLocation(textureShader.program, "pointLights[2].position"), pointLightPositions[2].x, pointLightPositions[2].y, pointLightPositions[2].z);
+	glUniform3f(glGetUniformLocation(textureShader.program, "pointLights[2].ambient"), 0.05f, 0.05f, 0.05f);
+	glUniform3f(glGetUniformLocation(textureShader.program, "pointLights[2].diffuse"), 0.8f, 0.8f, 0.8f);
+	glUniform3f(glGetUniformLocation(textureShader.program, "pointLights[2].specular"), 1.0f, 1.0f, 1.0f);
+	glUniform1f(glGetUniformLocation(textureShader.program, "pointLights[2].constant"), 1.0f);
+	glUniform1f(glGetUniformLocation(textureShader.program, "pointLights[2].linear"), 0.09f);
+	glUniform1f(glGetUniformLocation(textureShader.program, "pointLights[2].quadratic"), 0.032f);
+
+	glUniform3f(glGetUniformLocation(textureShader.program, "pointLights[3].position"), pointLightPositions[3].x, pointLightPositions[3].y, pointLightPositions[3].z);
+	glUniform3f(glGetUniformLocation(textureShader.program, "pointLights[3].ambient"), 0.05f, 0.05f, 0.05f);
+	glUniform3f(glGetUniformLocation(textureShader.program, "pointLights[3].diffuse"), 0.8f, 0.8f, 0.8f);
+	glUniform3f(glGetUniformLocation(textureShader.program, "pointLights[3].specular"), 1.0f, 1.0f, 1.0f);
+	glUniform1f(glGetUniformLocation(textureShader.program, "pointLights[3].constant"), 1.0f);
+	glUniform1f(glGetUniformLocation(textureShader.program, "pointLights[3].linear"), 0.09f);
+	glUniform1f(glGetUniformLocation(textureShader.program, "pointLights[3].quadratic"), 0.032f);
+
+	glUniform3f(glGetUniformLocation(textureShader.program, "spotLight.position"), camera.position.x, camera.position.y, camera.position.z);
+	glUniform3f(glGetUniformLocation(textureShader.program, "spotLight.direction"), camera.front.x, camera.front.y, camera.front.z);
+	glUniform3f(glGetUniformLocation(textureShader.program, "spotLight.ambient"), 0.0f, 0.0f, 0.0f);
+	glUniform3f(glGetUniformLocation(textureShader.program, "spotLight.diffuse"), 1.0f, 1.0f, 1.0f);
+	glUniform3f(glGetUniformLocation(textureShader.program, "spotLight.specular"), 1.0f, 1.0f, 1.0f);
+	glUniform1f(glGetUniformLocation(textureShader.program, "spotLight.constant"), 1.0f);
+	glUniform1f(glGetUniformLocation(textureShader.program, "spotLight.linear"), 0.09f);
+	glUniform1f(glGetUniformLocation(textureShader.program, "spotLight.quadratic"), 0.032f);
+	glUniform1f(glGetUniformLocation(textureShader.program, "spotLight.cutOff"), glm::cos(glm::radians(12.5f)));
+	glUniform1f(glGetUniformLocation(textureShader.program, "spotLight.outerCutOff"), glm::cos(glm::radians(15.0f)));
+
+	mat4 projection = perspective(camera.zoom, (GLfloat) SWIDTH / (GLfloat) SHEIGHT, 0.1f, 1000.0f);
+	mat4 view = camera.getViewMatrix();
+	mat4 model = mat4();
+
+	GLint modelLoc = glGetUniformLocation(textureShader.program, "model");
+	GLint viewLoc = glGetUniformLocation(textureShader.program, "view");
+	GLint projLoc = glGetUniformLocation(textureShader.program, "projection");
+
+	glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+	glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, diffuseTexture);
+
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, specularTexture);
 
 	glBindVertexArray(surfaceVAO);
-
 	glDrawArrays(GL_TRIANGLES, 0, surfaceVertices.size());
+	glBindVertexArray(0);
+
+	lampShader.use();
+	modelLoc = glGetUniformLocation(lampShader.program, "model");
+	viewLoc = glGetUniformLocation(lampShader.program, "view");
+	projLoc = glGetUniformLocation(lampShader.program, "projection");
+
+	glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+	glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+	model = glm::mat4();
+	model = glm::translate(model, lightPos);
+	model = glm::scale(model, glm::vec3(0.2f));
+	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+
+	glBindVertexArray(lampVAO);
+
+	glDrawArrays(GL_TRIANGLES, 0, 36);
+
+	for (GLuint i = 0; i < 4; i++) {
+		model = glm::mat4();
+		model = glm::translate(model, pointLightPositions[i]);
+		model = glm::scale(model, glm::vec3(0.2f));
+		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+		glDrawArrays(GL_TRIANGLES, 0, 36);
+	}
 
 	glBindVertexArray(0);
+
 	glUseProgram(0);
 }
 
@@ -498,6 +676,7 @@ void keyPressFunc(GLFWwindow* window, int key, int scancode, int action, int mod
 			break;
 
 		case GLFW_KEY_J:
+			firstMouse = true;
 			camera.position = vec3(0.0f, 0.0f, 1.3f);
 			camera.up = vec3(0.0f, 1.0f, 0.0f);
 			camera.front = vec3(0.0f, 0.0f, -1.0f);
@@ -512,80 +691,104 @@ void keyPressFunc(GLFWwindow* window, int key, int scancode, int action, int mod
 		break;
 
 
-		case GLFW_KEY_L:
-			camera.reset();
-			break;
+	case GLFW_KEY_L:
+		camera.reset();
+		break;
 
-		case GLFW_KEY_Q:
-			if (baseLineVertices.size() > 0) {
-				baseLineVertices.pop_back();
-				calculateBezier();
-			}
-			updatePoints();
-			break;
-
-		case GLFW_KEY_X:
-			if (bezierCurveVertices.size() > 0) {
-				isRotated = true;
-				calculateSurfeceVertices('x');
-				createSurfaceWithTex();
-			}
-			break;
-
-		case GLFW_KEY_Y:
-			if (bezierCurveVertices.size() > 0) {
-				isRotated = true;
-				calculateSurfeceVertices('y');
-				createSurfaceWithTex();
-			}
-			break;
-
-		case GLFW_KEY_E:
-			baseLineVertices.clear();
-			bezierCurveVertices.clear();
-			surfaceVertices.clear();
-
-			updatePoints();
-			isRotated = false;
-			break;
-
-		case GLFW_KEY_1:
-			surfaceMode = 't';
-			glDeleteTextures(1, &texture);
-			changeTexture("res/textures/homogenous.jpg");
-			break;
-
-		case GLFW_KEY_2:
-			surfaceMode = 't';
-			glDeleteTextures(1, &texture);
-			changeTexture("res/textures/metal.jpg");
-			break;
-
-		case GLFW_KEY_3:
-			surfaceMode = 't';
-			glDeleteTextures(1, &texture);
-			changeTexture("res/textures/natural.jpg");
-			break;
-
-		case GLFW_KEY_4:
-			glDeleteTextures(1, &texture);
-			surfaceMode = 'v';
-			break;
-
-		case GLFW_KEY_5:
-			glDeleteTextures(1, &texture);
-			surfaceMode = 'e';
-			break;
-
-		case GLFW_KEY_6:
-			glDeleteTextures(1, &texture);
-			surfaceMode = 'f';
-			break;
-
-		default:
-			break;
+	case GLFW_KEY_Q:
+		if (baseLineVertices.size() > 0) {
+			baseLineVertices.pop_back();
+			calculateBezier();
 		}
+		updatePoints();
+		break;
+
+	case GLFW_KEY_X:
+		if (bezierCurveVertices.size() > 0) {
+			isRotated = true;
+
+			camera.reset();
+			firstMouse = true;
+
+			surfaceMode = 't';
+			glDeleteTextures(1, &diffuseTexture);
+			glDeleteTextures(1, &specularTexture);
+			applyTexture("res/textures/red-diffuse.png", "res/textures/red-specular.png");
+
+			calculateSurfeceVertices('x');
+			createSurface();
+		}
+		break;
+
+	case GLFW_KEY_Y:
+		if (bezierCurveVertices.size() > 0) {
+			isRotated = true;
+
+			camera.reset();
+			firstMouse = true;
+
+			surfaceMode = 't';
+			glDeleteTextures(1, &diffuseTexture);
+			glDeleteTextures(1, &specularTexture);
+			applyTexture("res/textures/red-diffuse.png", "res/textures/red-specular.png");
+
+			calculateSurfeceVertices('y');
+			createSurface();
+		}
+		break;
+
+	case GLFW_KEY_E:
+		baseLineVertices.clear();
+		bezierCurveVertices.clear();
+		surfaceVertices.clear();
+
+		updatePoints();
+		isRotated = false;
+		break;
+
+	case GLFW_KEY_1:
+		surfaceMode = 't';
+		glDeleteTextures(1, &diffuseTexture);
+		glDeleteTextures(1, &specularTexture);
+		applyTexture("res/textures/red-diffuse.png", "res/textures/red-specular.png");
+		break;
+
+	case GLFW_KEY_2:
+		surfaceMode = 't';
+		glDeleteTextures(1, &diffuseTexture);
+		glDeleteTextures(1, &specularTexture);
+		applyTexture("res/textures/metal-diffuse.png", "res/textures/metal-specular.png");
+		break;
+
+	case GLFW_KEY_3:
+		surfaceMode = 't';
+		glDeleteTextures(1, &diffuseTexture);
+		glDeleteTextures(1, &specularTexture);
+		applyTexture("res/textures/wood-diffuse.png", "res/textures/wood-specular.png");
+		break;
+
+	case GLFW_KEY_4:
+		glDeleteTextures(1, &diffuseTexture);
+		glDeleteTextures(1, &specularTexture);
+		surfaceMode = 'v';
+		break;
+
+	case GLFW_KEY_5:
+		glDeleteTextures(1, &diffuseTexture);
+		glDeleteTextures(1, &specularTexture);
+		surfaceMode = 'e';
+		break;
+
+	case GLFW_KEY_6:
+		glDeleteTextures(1, &diffuseTexture);
+		glDeleteTextures(1, &specularTexture);
+		surfaceMode = 'f';
+		break;
+
+	default:
+		break;
 	}
+}
 }
 
 //----------------- EVENT HANDLERS ---------------------
@@ -662,13 +865,20 @@ int main() {
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-	defaultShader.load("res/shaders/default/vertex.glsl", "res/shaders/default/fragment.glsl");
-	textureShader.load("res/shaders/texture/vertex.glsl", "res/shaders/texture/fragment.glsl");
-	surfaceShader.load("res/shaders/surface/vertex.glsl", "res/shaders/default/fragment.glsl");
+	defaultShader.load("res/shaders/default/default.vert", "res/shaders/default/default.frag");
+	textureShader.load("res/shaders/texture/texture.vert", "res/shaders/texture/texture.frag");
+	surfaceShader.load("res/shaders/surface/surface.vert", "res/shaders/default/default.frag");
+	lampShader.load("res/shaders/lamp/lamp.vert", "res/shaders/lamp/lamp.frag");
 
 	createAxis();
 	createBase();
 	createCurve();
+	createLamp();
+
+	textureShader.use();
+	glUniform1i(glGetUniformLocation(textureShader.program, "material.diffuse"), 0);
+	glUniform1i(glGetUniformLocation(textureShader.program, "material.specular"), 1);
+	glUseProgram(0);
 
 	while (!glfwWindowShouldClose(window)) {
 		GLfloat currentFrame = glfwGetTime();
@@ -679,7 +889,7 @@ int main() {
 
 		doMovement();
 
-		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		display();
@@ -691,13 +901,16 @@ int main() {
 	glDeleteBuffers(1, &baseVBO);
 	glDeleteBuffers(1, &curveVBO);
 	glDeleteBuffers(1, &surfaceVBO);
+	glDeleteBuffers(1, &lampVBO);
 
 	glDeleteVertexArrays(1, &axisVAO);
 	glDeleteVertexArrays(1, &baseVAO);
 	glDeleteVertexArrays(1, &curveVAO);
 	glDeleteVertexArrays(1, &surfaceVAO);
+	glDeleteVertexArrays(1, &lampVAO);
 
-	glDeleteTextures(1, &texture);
+	glDeleteTextures(1, &diffuseTexture);
+	glDeleteTextures(1, &specularTexture);
 
 	glfwTerminate();
 
