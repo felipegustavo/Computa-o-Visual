@@ -85,6 +85,7 @@ vector<TextureVertex> surfaceVertices;
 bool isRotated = false;
 char surfaceMode = 't';
 bool isCtrl = false;
+bool useViewport = false;
 
 //----------------- ROTATION ---------------------
 
@@ -662,6 +663,31 @@ void mouseClickFunc(GLFWwindow* window, int button, int action, int mods) {
 	}
 }
 
+void setCameraToX() {
+	camera.position = vec3(1.3f, 0.0f, 0.0f);
+	camera.up = vec3(0.0f, 1.0f, 0.0f);
+	camera.front = vec3(-1.0f, 0.0f, 0.0f);
+}
+
+void setCameraToY() {
+	camera.position = vec3(0.0f, 1.3f, 0.0f);
+	camera.up = vec3(0.0f, 0.0f, 1.0f);
+	camera.front = vec3(0.0f, -1.0f, 0.0f);
+}
+
+void setCameraToZ() {
+	camera.position = vec3(0.0f, 0.0f, 1.3f);
+	camera.up = vec3(0.0f, 1.0f, 0.0f);
+	camera.front = vec3(0.0f, 0.0f, -1.0f);
+}
+
+void setCameraToIso() {
+	const double pos = sqrt(1 / 3.0);
+	camera.position = vec3(pos, pos, pos);
+	camera.up = vec3(0.0f, 1.0f, 0.0f);
+	camera.front = vec3(-pos, -pos, -pos);
+}
+
 void keyPressFunc(GLFWwindow* window, int key, int scancode, int action, int mods) {
 	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
 		glfwSetWindowShouldClose(window, GL_TRUE);
@@ -679,140 +705,131 @@ void keyPressFunc(GLFWwindow* window, int key, int scancode, int action, int mod
 		switch (key) {
 
 		case GLFW_KEY_G:
-			camera.position = vec3(1.3f, 0.0f, 0.0f);
-			camera.up = vec3(0.0f, 1.0f, 0.0f);
-			camera.front = vec3(-1.0f, 0.0f, 0.0f);
+			setCameraToX();
 			break;
 
 		case GLFW_KEY_H:
-			camera.position = vec3(0.0f, 1.3f, 0.0f);
-			camera.up = vec3(0.0f, 0.0f, 1.0f);
-			camera.front = vec3(0.0f, -1.0f, 0.0f);
+			setCameraToY();
 			break;
 
 		case GLFW_KEY_J:
-			firstMouse = true;
-			camera.position = vec3(0.0f, 0.0f, 1.3f);
-			camera.up = vec3(0.0f, 1.0f, 0.0f);
-			camera.front = vec3(0.0f, 0.0f, -1.0f);
+			setCameraToZ();
 			break;
 
-		case GLFW_KEY_K: {
-			const double pos = sqrt(1 / 3.0);
-			camera.position = vec3(pos, pos, pos);
-			camera.up = vec3(0.0f, 1.0f, 0.0f);
-			camera.front = vec3(-pos, -pos, -pos);
-		}
-		break;
+		case GLFW_KEY_K:
+			setCameraToIso();
+			break;
 
-
-	case GLFW_KEY_L:
-		camera.reset();
-		break;
-
-	case GLFW_KEY_Q:
-		if (baseLineVertices.size() > 0) {
-			baseLineVertices.pop_back();
-			calculateBezier();
-		}
-		updatePoints();
-		break;
-
-	case GLFW_KEY_X:
-		if (bezierCurveVertices.size() > 0) {
-			isRotated = true;
-
+		case GLFW_KEY_L:
 			camera.reset();
-			firstMouse = true;
+			break;
 
+		case GLFW_KEY_Q:
+			if (baseLineVertices.size() > 0) {
+				baseLineVertices.pop_back();
+				calculateBezier();
+			}
+			updatePoints();
+			break;
+
+		case GLFW_KEY_X:
+			if (bezierCurveVertices.size() > 0) {
+				isRotated = true;
+
+				camera.reset();
+				firstMouse = true;
+
+				surfaceMode = 't';
+				glDeleteTextures(1, &diffuseTexture);
+				glDeleteTextures(1, &specularTexture);
+				applyTexture("res/textures/red-diffuse.png", "res/textures/red-specular.png");
+
+				calculateSurfeceVertices('x');
+				createSurface();
+			}
+			break;
+
+		case GLFW_KEY_Y:
+			if (bezierCurveVertices.size() > 0) {
+				isRotated = true;
+
+				camera.reset();
+				firstMouse = true;
+
+				surfaceMode = 't';
+				glDeleteTextures(1, &diffuseTexture);
+				glDeleteTextures(1, &specularTexture);
+				applyTexture("res/textures/red-diffuse.png", "res/textures/red-specular.png");
+
+				calculateSurfeceVertices('y');
+				createSurface();
+			}
+			break;
+
+		case GLFW_KEY_E:
+			baseLineVertices.clear();
+			bezierCurveVertices.clear();
+			surfaceVertices.clear();
+
+			updatePoints();
+
+			isRotated = false;
+			isCtrl = false;
+			firstMouse = true;
+			break;
+
+		case GLFW_KEY_1:
 			surfaceMode = 't';
 			glDeleteTextures(1, &diffuseTexture);
 			glDeleteTextures(1, &specularTexture);
 			applyTexture("res/textures/red-diffuse.png", "res/textures/red-specular.png");
+			break;
 
-			calculateSurfeceVertices('x');
-			createSurface();
-		}
-		break;
-
-	case GLFW_KEY_Y:
-		if (bezierCurveVertices.size() > 0) {
-			isRotated = true;
-
-			camera.reset();
-			firstMouse = true;
-
+		case GLFW_KEY_2:
 			surfaceMode = 't';
 			glDeleteTextures(1, &diffuseTexture);
 			glDeleteTextures(1, &specularTexture);
-			applyTexture("res/textures/red-diffuse.png", "res/textures/red-specular.png");
+			applyTexture("res/textures/metal-diffuse.png", "res/textures/metal-specular.png");
+			break;
 
-			calculateSurfeceVertices('y');
-			createSurface();
+		case GLFW_KEY_3:
+			surfaceMode = 't';
+			glDeleteTextures(1, &diffuseTexture);
+			glDeleteTextures(1, &specularTexture);
+			applyTexture("res/textures/wood-diffuse.png", "res/textures/wood-specular.png");
+			break;
+
+		case GLFW_KEY_4:
+			glDeleteTextures(1, &diffuseTexture);
+			glDeleteTextures(1, &specularTexture);
+			surfaceMode = 'v';
+			break;
+
+		case GLFW_KEY_5:
+			glDeleteTextures(1, &diffuseTexture);
+			glDeleteTextures(1, &specularTexture);
+			surfaceMode = 'e';
+			break;
+
+		case GLFW_KEY_6:
+			glDeleteTextures(1, &diffuseTexture);
+			glDeleteTextures(1, &specularTexture);
+			surfaceMode = 'f';
+			break;
+
+		case GLFW_KEY_7:
+			isCtrl = !isCtrl;
+			break;
+
+		case GLFW_KEY_8:
+			useViewport = !useViewport;
+			break;
+
+		default:
+			break;
 		}
-		break;
-
-	case GLFW_KEY_E:
-		baseLineVertices.clear();
-		bezierCurveVertices.clear();
-		surfaceVertices.clear();
-
-		updatePoints();
-
-		isRotated = false;
-		isCtrl = false;
-		firstMouse = true;
-		break;
-
-	case GLFW_KEY_1:
-		surfaceMode = 't';
-		glDeleteTextures(1, &diffuseTexture);
-		glDeleteTextures(1, &specularTexture);
-		applyTexture("res/textures/red-diffuse.png", "res/textures/red-specular.png");
-		break;
-
-	case GLFW_KEY_2:
-		surfaceMode = 't';
-		glDeleteTextures(1, &diffuseTexture);
-		glDeleteTextures(1, &specularTexture);
-		applyTexture("res/textures/metal-diffuse.png", "res/textures/metal-specular.png");
-		break;
-
-	case GLFW_KEY_3:
-		surfaceMode = 't';
-		glDeleteTextures(1, &diffuseTexture);
-		glDeleteTextures(1, &specularTexture);
-		applyTexture("res/textures/wood-diffuse.png", "res/textures/wood-specular.png");
-		break;
-
-	case GLFW_KEY_4:
-		glDeleteTextures(1, &diffuseTexture);
-		glDeleteTextures(1, &specularTexture);
-		surfaceMode = 'v';
-		break;
-
-	case GLFW_KEY_5:
-		glDeleteTextures(1, &diffuseTexture);
-		glDeleteTextures(1, &specularTexture);
-		surfaceMode = 'e';
-		break;
-
-	case GLFW_KEY_6:
-		glDeleteTextures(1, &diffuseTexture);
-		glDeleteTextures(1, &specularTexture);
-		surfaceMode = 'f';
-		break;
-
-	case GLFW_KEY_7:
-		isCtrl = !isCtrl;
-		break;
-
-	default:
-		break;
 	}
 }
-}
-
 //----------------- EVENT HANDLERS ---------------------
 
 void display() {
@@ -849,6 +866,29 @@ void display() {
 		drawCurve();
 	}
 }
+
+void display2() {
+	if (!isRotated) {
+		return;
+	}
+
+	glViewport(0, 360, 640, 360);
+	setCameraToX();
+	display();
+
+	glViewport(640, 360, 640, 360);
+	setCameraToY();
+	display();
+
+	glViewport(0, 0, 640, 360);
+	setCameraToZ();
+	display();
+
+	glViewport(640, 0, 640, 360);
+	setCameraToIso();
+	display();
+}
+
 
 int main() {
 	glfwInit();
@@ -919,7 +959,13 @@ int main() {
 		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		display();
+		if (useViewport) {
+			display2();
+		} else {
+			glViewport(0, 0, 1280, 720);
+			camera.reset();
+			display();
+		}
 
 		glfwSwapBuffers(window);
 	}
