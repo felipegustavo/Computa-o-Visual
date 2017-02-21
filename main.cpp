@@ -50,6 +50,7 @@ glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
 Shader defaultShader;
 Shader textureShader;
 Shader surfaceShader;
+Shader ctrlShader;
 Shader lampShader;
 
 GLuint surfaceVAO;
@@ -83,6 +84,7 @@ vector<TextureVertex> surfaceVertices;
 
 bool isRotated = false;
 char surfaceMode = 't';
+bool isCtrl = false;
 
 //----------------- ROTATION ---------------------
 
@@ -504,7 +506,7 @@ void drawSurfaceWithTex() {
 	glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
 	model = glm::mat4();
 	model = glm::translate(model, lightPos);
-	model = glm::scale(model, glm::vec3(0.2f));
+	model = glm::scale(model, glm::vec3(0.1f));
 	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 
 	glBindVertexArray(lampVAO);
@@ -514,7 +516,7 @@ void drawSurfaceWithTex() {
 	for (GLuint i = 0; i < 4; i++) {
 		model = glm::mat4();
 		model = glm::translate(model, pointLightPositions[i]);
-		model = glm::scale(model, glm::vec3(0.2f));
+		model = glm::scale(model, glm::vec3(0.1f));
 		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 		glDrawArrays(GL_TRIANGLES, 0, 36);
 	}
@@ -528,6 +530,19 @@ void drawSurfaceWithVertices() {
 	surfaceShader.use();
 
 	prepareCamera(surfaceShader.program);
+
+	glBindVertexArray(surfaceVAO);
+	glPointSize(2);
+	glDrawArrays(GL_POINTS, 0, surfaceVertices.size());
+
+	glBindVertexArray(0);
+	glUseProgram(0);
+}
+
+void drawCtrlPoints() {
+	ctrlShader.use();
+
+	prepareCamera(ctrlShader.program);
 
 	glBindVertexArray(surfaceVAO);
 	glPointSize(2);
@@ -743,7 +758,10 @@ void keyPressFunc(GLFWwindow* window, int key, int scancode, int action, int mod
 		surfaceVertices.clear();
 
 		updatePoints();
+
 		isRotated = false;
+		isCtrl = false;
+		firstMouse = true;
 		break;
 
 	case GLFW_KEY_1:
@@ -785,6 +803,10 @@ void keyPressFunc(GLFWwindow* window, int key, int scancode, int action, int mod
 		surfaceMode = 'f';
 		break;
 
+	case GLFW_KEY_7:
+		isCtrl = !isCtrl;
+		break;
+
 	default:
 		break;
 	}
@@ -796,6 +818,10 @@ void keyPressFunc(GLFWwindow* window, int key, int scancode, int action, int mod
 void display() {
 	if (isRotated) {
 		drawAxis2();
+
+		if (isCtrl) {
+			drawCtrlPoints();
+		}
 
 		switch (surfaceMode) {
 
@@ -869,6 +895,7 @@ int main() {
 	textureShader.load("res/shaders/texture/texture.vert", "res/shaders/texture/texture.frag");
 	surfaceShader.load("res/shaders/surface/surface.vert", "res/shaders/default/default.frag");
 	lampShader.load("res/shaders/lamp/lamp.vert", "res/shaders/lamp/lamp.frag");
+	ctrlShader.load("res/shaders/ctrl/ctrl.vert", "res/shaders/default/default.frag");
 
 	createAxis();
 	createBase();
